@@ -1,0 +1,44 @@
+{
+  "description": "TrustGuard AI firewall for Codex agent hooks",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./hooks/trustguard-hook.sh",
+            "timeout": 30,
+            "statusMessage": "TrustGuard evaluating prompt",
+            "commandWindows": "powershell -NoProfile -ExecutionPolicy Bypass -File ./hooks/trustguard-hook.ps1"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./hooks/trustguard-hook.sh",
+            "timeout": 30,
+            "statusMessage": "TrustGuard evaluating tool call",
+            "commandWindows": "powershell -NoProfile -ExecutionPolicy Bypass -File ./hooks/trustguard-hook.ps1"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./hooks/trustguard-hook.sh",
+            "timeout": 30,
+            "statusMessage": "TrustGuard evaluating tool result",
+            "commandWindows": "powershell -NoProfile -ExecutionPolicy Bypass -File ./hooks/trustguard-hook.ps1"
+          }
+        ]
+      }
+    ]
+  }
+}

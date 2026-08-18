@@ -1,0 +1,37 @@
+# Example Codex enterprise requirements for TrustGuard.
+#
+# Deploy this (or your MDM equivalent) so developers cannot disable the
+# firewall hooks. Scripts under managed_dir must already be installed by IT —
+# Codex does not distribute them.
+#
+# Docs: https://developers.openai.com/codex/hooks
+
+[features]
+hooks = true
+allow_managed_hooks_only = true
+
+[hooks]
+# Absolute paths on developer machines after MDM install.
+managed_dir = "/Library/Application Support/TrustGuard/codex-hooks"
+windows_managed_dir = 'C:\ProgramData\TrustGuard\codex-hooks'
+
+[[hooks.UserPromptSubmit]]
+[[hooks.UserPromptSubmit.hooks]]
+type = "command"
+command = '/Library/Application Support/TrustGuard/codex-hooks/trustguard-hook.sh'
+timeout = 30
+statusMessage = "TrustGuard evaluating prompt"
+
+[[hooks.PreToolUse]]
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = '/Library/Application Support/TrustGuard/codex-hooks/trustguard-hook.sh'
+timeout = 30
+statusMessage = "TrustGuard evaluating tool call"
+
+[[hooks.PostToolUse]]
+[[hooks.PostToolUse.hooks]]
+type = "command"
+command = '/Library/Application Support/TrustGuard/codex-hooks/trustguard-hook.sh'
+timeout = 30
+statusMessage = "TrustGuard evaluating tool result"

@@ -1,0 +1,9 @@
+# Build artefacts
+bin/
+dist/
+*.exe
+
+# Editor / OS
+.DS_Store
+*.swp
+node_modules/

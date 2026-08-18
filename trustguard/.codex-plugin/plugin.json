@@ -1,0 +1,25 @@
+{
+  "name": "trustguard",
+  "version": "0.1.0",
+  "description": "AI firewall for the Codex agent: evaluates prompts, tool calls and tool results with NeuralTrust TrustGuard.",
+  "author": {
+    "name": "NeuralTrust",
+    "email": "hello@neuraltrust.ai",
+    "url": "https://neuraltrust.ai"
+  },
+  "homepage": "https://neuraltrust.ai",
+  "repository": "https://github.com/NeuralTrust/trustguard-codex-plugin",
+  "license": "Apache-2.0",
+  "keywords": ["security", "firewall", "trustguard", "enterprise", "hooks"],
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.json",
+  "interface": {
+    "displayName": "TrustGuard",
+    "shortDescription": "AI firewall for Codex prompts and tools",
+    "longDescription": "Evaluates every user prompt, tool call and tool result with NeuralTrust TrustGuard before Codex continues. Enterprise-ready: one org collector key via MDM, no NeuralTrust login per developer.",
+    "developerName": "NeuralTrust",
+    "category": "Security",
+    "websiteURL": "https://neuraltrust.ai",
+    "logo": "./assets/logo.svg"
+  }
+}
