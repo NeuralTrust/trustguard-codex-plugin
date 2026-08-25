@@ -26,8 +26,8 @@ type Config struct {
 	FailMode string `json:"fail_mode"`
 	// TransformAction maps a `transform` verdict (DLP found PII/secrets; hooks
 	// cannot rewrite content): "ask" (default), "deny" or "allow".
-	// Codex PreToolUse does not honour "ask", so ask is treated as allow with
-	// a warning unless transform_action is deny.
+	// Codex does not honour permissionDecision "ask" yet, so ask is surfaced as
+	// allow + additionalContext unless transform_action is deny.
 	TransformAction string `json:"transform_action"`
 	// ReportNotice attaches a user-visible warning when findings are report-only.
 	ReportNotice *bool `json:"report_notice"`
