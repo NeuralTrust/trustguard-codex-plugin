@@ -253,6 +253,13 @@ func TestPreToolUseGateAskBecomesContext(t *testing.T) {
 	if out.HookSpecificOutput == nil || out.HookSpecificOutput.AdditionalContext == "" {
 		t.Fatalf("expected additionalContext for gate ask, got %+v", out)
 	}
+	got := out.HookSpecificOutput.AdditionalContext
+	if strings.Contains(got, "gate_ask") {
+		t.Fatalf("internal signal type must not appear in the prompt, got %q", got)
+	}
+	if !strings.Contains(got, "confirm-bash") {
+		t.Fatalf("expected gate name in ask context, got %q", got)
+	}
 }
 
 func TestPreToolUseTransformDenyBlocks(t *testing.T) {
