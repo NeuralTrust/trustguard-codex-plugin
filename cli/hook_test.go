@@ -124,6 +124,10 @@ func TestBashPreToolUseBlock(t *testing.T) {
 	if payload["input"] != "rm -rf /" {
 		t.Fatalf("unexpected payload: %v", payload)
 	}
+	attrs := (*captured)["attributes"].(map[string]any)
+	if attrs["tool"].(map[string]any)["name"] != "Bash" {
+		t.Fatalf("expected attributes.tool.name=Bash, got %v", attrs)
+	}
 }
 
 func TestMCPPreToolUseScoredAsToolsCall(t *testing.T) {
