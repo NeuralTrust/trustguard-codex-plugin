@@ -141,6 +141,17 @@ func TestMCPPreToolUseScoredAsToolsCall(t *testing.T) {
 	if payload["method"] != "tools/call" {
 		t.Fatalf("expected tools/call, got %v", payload)
 	}
+	params := payload["params"].(map[string]any)
+	if params["name"] != "mcp__fs__read" {
+		t.Fatalf("expected payload.params.name=mcp__fs__read, got %v", params)
+	}
+	if params["arguments"].(map[string]any)["path"] != "/etc/passwd" {
+		t.Fatalf("expected arguments forwarded, got %v", params["arguments"])
+	}
+	attrs := (*captured)["attributes"].(map[string]any)
+	if _, ok := attrs["tool"]; ok {
+		t.Fatalf("MCP tools/call must not stamp attributes.tool, got %v", attrs)
+	}
 }
 
 func TestPreToolUseTransformAskBecomesContext(t *testing.T) {
