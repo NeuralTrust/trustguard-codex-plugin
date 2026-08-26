@@ -124,6 +124,10 @@ func TestBashPreToolUseBlock(t *testing.T) {
 	if payload["input"] != "rm -rf /" {
 		t.Fatalf("unexpected payload: %v", payload)
 	}
+	attrs := (*captured)["attributes"].(map[string]any)
+	if attrs["tool"].(map[string]any)["name"] != "Bash" {
+		t.Fatalf("expected attributes.tool.name=Bash, got %v", attrs)
+	}
 }
 
 func TestMCPPreToolUseScoredAsToolsCall(t *testing.T) {
@@ -140,6 +144,57 @@ func TestMCPPreToolUseScoredAsToolsCall(t *testing.T) {
 	payload := (*captured)["payload"].(map[string]any)
 	if payload["method"] != "tools/call" {
 		t.Fatalf("expected tools/call, got %v", payload)
+	}
+	params := payload["params"].(map[string]any)
+	if params["name"] != "read" {
+		t.Fatalf("expected payload.params.name=read, got %v", params)
+	}
+	if params["arguments"].(map[string]any)["path"] != "/etc/passwd" {
+		t.Fatalf("expected arguments forwarded, got %v", params["arguments"])
+	}
+	attrs := (*captured)["attributes"].(map[string]any)
+	if _, ok := attrs["tool"]; ok {
+		t.Fatalf("MCP tools/call must not stamp attributes.tool, got %v", attrs)
+	}
+}
+
+func TestPreToolUseStripsMCPHookPrefix(t *testing.T) {
+	srv, captured := stubGuard(t, EvaluateResponse{Status: "allow"})
+	_ = invokeHook(t, testConfig(srv.URL), map[string]any{
+		"hook_event_name": "PreToolUse",
+		"tool_name":       "mcp__4916e5d1-9114-4c57-bf38-0355f163a289__search_threads",
+		"tool_input":      map[string]any{"q": "auth"},
+		"session_id":      "thr_1",
+	})
+	if (*captured)["protocol"] != "mcp" {
+		t.Fatalf("expected mcp protocol, got %v", (*captured)["protocol"])
+	}
+	params := (*captured)["payload"].(map[string]any)["params"].(map[string]any)
+	if params["name"] != "search_threads" {
+		t.Fatalf("expected params.name=search_threads, got %v", params)
+	}
+	attrs := (*captured)["attributes"].(map[string]any)
+	if _, ok := attrs["tool"]; ok {
+		t.Fatalf("MCP tools/call must not stamp attributes.tool, got %v", attrs)
+	}
+}
+
+func TestMCPCallName(t *testing.T) {
+	cases := []struct {
+		in, want string
+	}{
+		{"search_docs", "search_docs"},
+		{"mcp__fs__read", "read"},
+		{"mcp__4916e5d1-9114-4c57-bf38-0355f163a289__search_threads", "search_threads"},
+		{"mcp__server", "mcp__server"},
+		{"mcp__server__", "mcp__server__"},
+		{"Bash", "Bash"},
+		{"", ""},
+	}
+	for _, tc := range cases {
+		if got := mcpCallName(tc.in); got != tc.want {
+			t.Errorf("mcpCallName(%q) = %q, want %q", tc.in, got, tc.want)
+		}
 	}
 }
 
