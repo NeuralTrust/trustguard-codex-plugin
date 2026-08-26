@@ -147,7 +147,7 @@ func buildEvaluateRequest(cfg Config, in hookInput) (EvaluateRequest, bool) {
 			"id":      1,
 			"method":  "tools/call",
 			"params": map[string]any{
-				"name":      in.ToolName,
+				"name":      mcpCallName(in.ToolName),
 				"arguments": decodeToolArguments(in.ToolInput),
 			},
 		}
@@ -167,7 +167,7 @@ func buildEvaluateRequest(cfg Config, in hookInput) (EvaluateRequest, bool) {
 				"content": []any{map[string]any{"type": "text", "text": clip(text, cfg.MaxContentBytes)}},
 			},
 		}
-		stampToolName(base.Attributes, in.ToolName)
+		stampToolName(base.Attributes, mcpCallName(in.ToolName))
 		return base, true
 	}
 	return base, false
@@ -383,6 +383,25 @@ func stampToolName(attrs map[string]any, toolName string) {
 		return
 	}
 	attrs["tool"] = map[string]any{"name": toolName}
+}
+
+// mcpCallName is the JSON-RPC tools/call name. Hosts expose MCP tools to hooks
+// as mcp__<server>__<tool>; the MCP server (including TrustGate gateway)
+// only receives <tool>.
+func mcpCallName(hookToolName string) string {
+	const prefix = "mcp__"
+	if !strings.HasPrefix(hookToolName, prefix) {
+		return hookToolName
+	}
+	rest := hookToolName[len(prefix):]
+	i := strings.LastIndex(rest, "__")
+	if i < 0 {
+		return hookToolName
+	}
+	if name := rest[i+2:]; name != "" {
+		return name
+	}
+	return hookToolName
 }
 
 func clip(s string, n int) string {
