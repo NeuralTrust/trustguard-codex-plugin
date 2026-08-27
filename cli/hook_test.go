@@ -86,8 +86,8 @@ func TestPromptBlock(t *testing.T) {
 	if (*captured)["session_id"] != "thr_1" {
 		t.Fatalf("expected session_id thr_1, got %v", (*captured)["session_id"])
 	}
-	if (*captured)["consumer_id"] != "codex:alice@acme.com" {
-		t.Fatalf("expected consumer_id from user_email, got %v", (*captured)["consumer_id"])
+	if (*captured)["consumer_id"] != "codex:test" {
+		t.Fatalf("expected configured consumer_id, got %v", (*captured)["consumer_id"])
 	}
 }
 

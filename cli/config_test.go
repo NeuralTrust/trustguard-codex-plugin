@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"os"
 	"path/filepath"
 	"testing"
@@ -33,4 +34,52 @@ func TestManagedModeLocksKeyFields(t *testing.T) {
 	if cfg.TimeoutMS != 1234 {
 		t.Fatalf("soft pref timeout_ms not applied, got %d", cfg.TimeoutMS)
 	}
+}
+
+func TestConsumerIDForReadsAuthJSON(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("CODEX_HOME", home)
+	tok := unsignedJWT(`{"email":"joan@acme.com"}`)
+	body := `{"tokens":{"id_token":"` + tok + `"}}`
+	if err := os.WriteFile(filepath.Join(home, "auth.json"), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got := consumerIDFor(Config{}, hookInput{})
+	if got != "joan@acme.com" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestConsumerIDForHookEmailBeatsAuthJSON(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("CODEX_HOME", home)
+	tok := unsignedJWT(`{"email":"joan@acme.com"}`)
+	body := `{"tokens":{"id_token":"` + tok + `"}}`
+	if err := os.WriteFile(filepath.Join(home, "auth.json"), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got := consumerIDFor(Config{}, hookInput{UserEmail: "alice@acme.com"})
+	if got != "alice@acme.com" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestConsumerIDForConfiguredBeatsAuthJSON(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("CODEX_HOME", home)
+	tok := unsignedJWT(`{"email":"joan@acme.com"}`)
+	body := `{"tokens":{"id_token":"` + tok + `"}}`
+	if err := os.WriteFile(filepath.Join(home, "auth.json"), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got := consumerIDFor(Config{ConsumerID: "codex:mdm"}, hookInput{UserEmail: "alice@acme.com"})
+	if got != "codex:mdm" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func unsignedJWT(payload string) string {
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`))
+	body := base64.RawURLEncoding.EncodeToString([]byte(payload))
+	return header + "." + body + ".x"
 }

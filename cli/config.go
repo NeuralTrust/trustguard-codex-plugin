@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"io"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -35,8 +37,9 @@ type Config struct {
 	TimeoutMS int `json:"timeout_ms"`
 	// MaxContentBytes truncates tool content sent to the guard.
 	MaxContentBytes int `json:"max_content_bytes"`
-	// ConsumerID anchors anomaly detection and policy routing. Prefer an
-	// email from the hook payload at runtime; this field is the fallback.
+	// ConsumerID is an explicit override (MDM / TRUSTGUARD_CONSUMER_ID).
+	// If empty, runtime uses hook user_email, then the ChatGPT email in
+	// ~/.codex/auth.json, then the OS user.
 	ConsumerID string `json:"consumer_id"`
 	// Events disables individual hook events, e.g. {"PostToolUse": false}.
 	Events map[string]bool `json:"events"`
@@ -184,9 +187,6 @@ func (c *Config) applyDefaults() {
 	if c.MaxContentBytes <= 0 {
 		c.MaxContentBytes = defaultMaxContentBytes
 	}
-	if c.ConsumerID == "" {
-		c.ConsumerID = currentUser()
-	}
 }
 
 func (c *Config) timeout() time.Duration {
@@ -205,23 +205,108 @@ func (c *Config) reportNotice() bool {
 	return c.ReportNotice == nil || *c.ReportNotice
 }
 
-// consumerIDFor prefers an email from the hook payload when present, then the
-// configured fallback, then the OS user. Codex common fields do not always
-// include email; managed installs often set consumer_id via MDM.
+// consumerIDFor prefers an explicit configured consumer_id, then hook
+// user_email when present, then the ChatGPT account in ~/.codex/auth.json,
+// then the OS user.
 func consumerIDFor(cfg Config, in hookInput) string {
-	if email := strings.TrimSpace(in.UserEmail); email != "" {
-		return "codex:" + email
-	}
 	if cfg.ConsumerID != "" {
 		return cfg.ConsumerID
+	}
+	if email := looksLikeEmail(in.UserEmail); email != "" {
+		return email
+	}
+	if email := codexAccountEmail(); email != "" {
+		return email
 	}
 	return currentUser()
 }
 
+func looksLikeEmail(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" || !strings.Contains(s, "@") || strings.ContainsAny(s, " \t\n") {
+		return ""
+	}
+	return s
+}
+
+func codexAccountEmail() string {
+	for _, p := range codexAuthJSONPaths() {
+		if email := emailFromCodexAuthJSON(p); email != "" {
+			return email
+		}
+	}
+	return ""
+}
+
+func codexAuthJSONPaths() []string {
+	if home := strings.TrimSpace(os.Getenv("CODEX_HOME")); home != "" {
+		return []string{filepath.Join(home, "auth.json")}
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		return []string{filepath.Join(home, ".codex", "auth.json")}
+	}
+	return nil
+}
+
+func emailFromCodexAuthJSON(path string) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+	var doc struct {
+		Email  string `json:"email"`
+		Tokens *struct {
+			IDToken     string `json:"id_token"`
+			AccessToken string `json:"access_token"`
+		} `json:"tokens"`
+	}
+	if err := json.NewDecoder(io.LimitReader(f, 2<<20)).Decode(&doc); err != nil {
+		return ""
+	}
+	if email := looksLikeEmail(doc.Email); email != "" {
+		return email
+	}
+	if doc.Tokens == nil {
+		return ""
+	}
+	if email := emailFromJWT(doc.Tokens.IDToken); email != "" {
+		return email
+	}
+	return emailFromJWT(doc.Tokens.AccessToken)
+}
+
+func emailFromJWT(tok string) string {
+	parts := strings.Split(tok, ".")
+	if len(parts) < 2 {
+		return ""
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return ""
+	}
+	var claims struct {
+		Email   string `json:"email"`
+		Profile *struct {
+			Email string `json:"email"`
+		} `json:"https://api.openai.com/profile"`
+	}
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return ""
+	}
+	if email := looksLikeEmail(claims.Email); email != "" {
+		return email
+	}
+	if claims.Profile == nil {
+		return ""
+	}
+	return looksLikeEmail(claims.Profile.Email)
+}
+
 func currentUser() string {
 	if u, err := user.Current(); err == nil && u.Username != "" {
-		return "codex:" + u.Username
+		return u.Username
 	}
 	host, _ := os.Hostname()
-	return "codex:" + host
+	return host
 }

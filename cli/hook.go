@@ -20,7 +20,8 @@ type hookInput struct {
 	TurnID         string `json:"turn_id"`
 	Model          string `json:"model"`
 	PermissionMode string `json:"permission_mode"`
-	// UserEmail is optional; Codex does not always send it. Prefer when present.
+	// UserEmail is optional; Codex does not always send it. Used for
+	// consumer_id when consumer_id is not set in config.
 	UserEmail string `json:"user_email"`
 
 	// UserPromptSubmit
