@@ -18,7 +18,7 @@ import (
 	"os"
 )
 
-const integrationVersion = "0.1.0"
+const integrationVersion = "0.1.1"
 
 func main() {
 	cmd := "hook"
