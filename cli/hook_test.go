@@ -89,6 +89,9 @@ func TestPromptBlock(t *testing.T) {
 	if (*captured)["consumer_id"] != "codex:test" {
 		t.Fatalf("expected configured consumer_id, got %v", (*captured)["consumer_id"])
 	}
+	if got := userEmailAttr(t, captured); got != "alice@acme.com" {
+		t.Fatalf("expected attributes.user.email=alice@acme.com, got %q", got)
+	}
 }
 
 func TestPromptAllow(t *testing.T) {
@@ -370,4 +373,12 @@ func TestConsumerIDFallsBackToConfig(t *testing.T) {
 	if (*captured)["consumer_id"] != "codex:mdm-user" {
 		t.Fatalf("expected configured consumer_id, got %v", (*captured)["consumer_id"])
 	}
+}
+
+func userEmailAttr(t *testing.T, captured *map[string]any) string {
+	t.Helper()
+	attrs, _ := (*captured)["attributes"].(map[string]any)
+	user, _ := attrs["user"].(map[string]any)
+	email, _ := user["email"].(string)
+	return email
 }
