@@ -42,6 +42,12 @@ case "$(uname -s)" in
     *) OS="" ;;
 esac
 
+# Local and MDM installs use the stable, unversioned filename.
+LOCAL_BIN="$BIN_DIR/trustguard-codex$EXT"
+if [ -x "$LOCAL_BIN" ]; then
+    exec "$LOCAL_BIN" hook
+fi
+
 BIN="$BIN_DIR/trustguard-codex-$VERSION$EXT"
 if [ -x "$BIN" ]; then
     exec "$BIN" hook
