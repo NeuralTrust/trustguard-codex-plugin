@@ -48,6 +48,10 @@ try {
     $binDir = if ($env:TRUSTGUARD_CODEX_BIN_DIR) { $env:TRUSTGUARD_CODEX_BIN_DIR } else { Join-Path $env:USERPROFILE '.trustguard\bin' }
     $baseUrl = if ($env:TRUSTGUARD_CODEX_DOWNLOAD_BASE) { $env:TRUSTGUARD_CODEX_DOWNLOAD_BASE } else { 'https://github.com/NeuralTrust/trustguard-codex-plugin/releases/download' }
 
+    # Local and MDM installs use the stable, unversioned filename.
+    $localBin = Join-Path $binDir 'trustguard-codex.exe'
+    if ((Test-Path -PathType Leaf $localBin) -and -not $InstallOnly) { Invoke-Hook $localBin }
+
     $bin = Join-Path $binDir "trustguard-codex-$Version.exe"
     if ((Test-Path $bin) -and -not $InstallOnly) { Invoke-Hook $bin }
 

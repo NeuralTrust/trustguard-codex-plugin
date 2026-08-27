@@ -12,6 +12,7 @@ dist: ## Cross-compile every release binary into ./dist/ (VERSION=X.Y.Z)
 
 test: ## Run the test suite
 	go test -race ./cli/
+	sh tests/bootstrap-hook.sh
 
 lint: ## Vet the sources
 	go vet ./cli/
