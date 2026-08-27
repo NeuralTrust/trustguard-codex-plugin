@@ -212,13 +212,17 @@ func consumerIDFor(cfg Config, in hookInput) string {
 	if cfg.ConsumerID != "" {
 		return cfg.ConsumerID
 	}
-	if email := looksLikeEmail(in.UserEmail); email != "" {
-		return email
-	}
-	if email := codexAccountEmail(); email != "" {
+	if email := accountEmail(in); email != "" {
 		return email
 	}
 	return currentUser()
+}
+
+func accountEmail(in hookInput) string {
+	if email := looksLikeEmail(in.UserEmail); email != "" {
+		return email
+	}
+	return codexAccountEmail()
 }
 
 func looksLikeEmail(s string) string {
