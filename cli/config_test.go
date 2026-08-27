@@ -45,7 +45,7 @@ func TestConsumerIDForReadsAuthJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := consumerIDFor(Config{}, hookInput{})
-	if got != "codex:joan@acme.com" {
+	if got != "joan@acme.com" {
 		t.Fatalf("got %q", got)
 	}
 }
@@ -59,7 +59,7 @@ func TestConsumerIDForHookEmailBeatsAuthJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := consumerIDFor(Config{}, hookInput{UserEmail: "alice@acme.com"})
-	if got != "codex:alice@acme.com" {
+	if got != "alice@acme.com" {
 		t.Fatalf("got %q", got)
 	}
 }

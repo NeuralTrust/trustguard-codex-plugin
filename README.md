@@ -56,9 +56,10 @@ Developers cannot disable managed hooks from `/hooks`.
 | `PreToolUse` (MCP / other tools) | `mcp` tools/call | input | Same deny / ask-as-context shape |
 | `PostToolUse` | `mcp` result | output | Detector `block` replaces the tool result; gate `ask` is ignored |
 
-`consumer_id` = `codex:<account-email>` from hook `user_email` when present,
+`consumer_id` is the account email from hook `user_email` when present,
 else the ChatGPT email in `~/.codex/auth.json` (`tokens.id_token` / `email`
-claim). Override with `TRUSTGUARD_CONSUMER_ID` or `consumer_id` in config.
+claim). The collector already identifies the source. Override with
+`TRUSTGUARD_CONSUMER_ID` or `consumer_id` in config.
 
 ## Repository layout
 

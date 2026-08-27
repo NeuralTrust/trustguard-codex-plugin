@@ -213,10 +213,10 @@ func consumerIDFor(cfg Config, in hookInput) string {
 		return cfg.ConsumerID
 	}
 	if email := looksLikeEmail(in.UserEmail); email != "" {
-		return "codex:" + email
+		return email
 	}
 	if email := codexAccountEmail(); email != "" {
-		return "codex:" + email
+		return email
 	}
 	return currentUser()
 }
@@ -305,8 +305,8 @@ func emailFromJWT(tok string) string {
 
 func currentUser() string {
 	if u, err := user.Current(); err == nil && u.Username != "" {
-		return "codex:" + u.Username
+		return u.Username
 	}
 	host, _ := os.Hostname()
-	return "codex:" + host
+	return host
 }
