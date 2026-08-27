@@ -10,8 +10,8 @@ param([switch]$InstallOnly)
 $Version = '0.1.0'
 
 $Sha256 = @{
-    'amd64' = ''
-    'arm64' = ''
+    'amd64' = '5d15192f331ecea483b74ad70f50985d77ddb938251010680a06d4f9243873c0'
+    'arm64' = '585d803f6b60522f961bb0e25bbbfcfda4419c74723028e391001287811a98f3'
 }
 
 $Stdin = if ($InstallOnly) { $null } else { [Console]::In.ReadLine() }
