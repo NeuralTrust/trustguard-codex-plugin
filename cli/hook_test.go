@@ -92,6 +92,10 @@ func TestPromptBlock(t *testing.T) {
 	if got := userEmailAttr(t, captured); got != "alice@acme.com" {
 		t.Fatalf("expected attributes.user.email=alice@acme.com, got %q", got)
 	}
+	codex := hookAttr(t, captured, "codex")
+	if codex["hook_event_name"] != "UserPromptSubmit" || codex["cwd"] != "/tmp/demo" {
+		t.Fatalf("expected full hook JSON in attributes.codex, got %v", codex)
+	}
 }
 
 func TestPromptAllow(t *testing.T) {
@@ -394,10 +398,40 @@ func TestConsumerIDOmittedWithoutConfig(t *testing.T) {
 	}
 }
 
+func TestEvaluateStampsFullHookJSON(t *testing.T) {
+	t.Setenv("CODEX_HOME", t.TempDir())
+	srv, captured := stubGuard(t, EvaluateResponse{Status: "allow"})
+	_ = invokeHook(t, testConfig(srv.URL), map[string]any{
+		"hook_event_name": "UserPromptSubmit",
+		"prompt":          "hello",
+		"session_id":      "thr_1",
+		"turn_id":         "turn-9",
+		"cwd":             "/tmp/demo",
+		"model":           "o4-mini",
+		"permission_mode": "default",
+		"user_email":      "alice@acme.com",
+		"future_extra":    "kept",
+	})
+	codex := hookAttr(t, captured, "codex")
+	if codex["model"] != "o4-mini" || codex["turn_id"] != "turn-9" || codex["future_extra"] != "kept" {
+		t.Fatalf("attributes.codex must keep every stdin field, got %v", codex)
+	}
+}
+
 func userEmailAttr(t *testing.T, captured *map[string]any) string {
 	t.Helper()
 	attrs, _ := (*captured)["attributes"].(map[string]any)
 	user, _ := attrs["user"].(map[string]any)
 	email, _ := user["email"].(string)
 	return email
+}
+
+func hookAttr(t *testing.T, captured *map[string]any, key string) map[string]any {
+	t.Helper()
+	attrs, _ := (*captured)["attributes"].(map[string]any)
+	nested, _ := attrs[key].(map[string]any)
+	if nested == nil {
+		t.Fatalf("missing attributes.%s in %v", key, attrs)
+	}
+	return nested
 }
