@@ -1,4 +1,4 @@
-.PHONY: build dist test lint install-local uninstall-local
+.PHONY: build dist test lint install-local uninstall-local release-plan
 
 LOCAL_PLUGIN_DIR ?= $(HOME)/.codex/plugins/trustguard
 VERSION ?= dev
@@ -16,6 +16,9 @@ test: ## Run the test suite
 
 lint: ## Vet the sources
 	go vet ./cli/
+
+release-plan: ## Print what the Release workflow would do (mode + version)
+	@python3 scripts/release.py plan
 
 # Copies the plugin and writes ~/.codex/hooks.json with absolute paths.
 # Codex runs hooks with the session cwd, so relative paths are unreliable.

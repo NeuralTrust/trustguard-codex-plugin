@@ -1,0 +1,219 @@
+# Release trustguard-codex without ever pushing to a protected branch.
+#
+# `main` is covered by the org ruleset main-rule (pull request + 1 approval),
+# so the workflow can not commit the pinned bootstraps itself. It instead runs
+# as a state machine over the version in plugin.json and the v* tags:
+#
+#   pinned version has no tag  -> publish: rebuild, verify the pins still match,
+#                                 tag and cut the GitHub Release
+#   pinned version is released -> prepare: bump the patch, pin the new
+#                                 checksums, push the release/vX.Y.Z branch
+#
+# So merging anything into main refreshes the release branch, and merging its
+# pull request publishes. The org forbids Actions from opening pull requests,
+# so the first one per release is opened by hand from the link in the run
+# summary. State comes from the repo, not from commit messages, so it works
+# with merge, squash or rebase.
+#
+# Manual run: Actions -> Release -> Run workflow.
+
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # Pinned so the publish job rebuilds binaries byte-identical to the ones the
+  # prepare job measured. GOTOOLCHAIN=local forbids silently switching to a
+  # newer toolchain, so raising the go directive in go.mod fails the build
+  # until GO_VERSION is raised with it.
+  GO_VERSION: '1.26.5'
+  GOTOOLCHAIN: local
+
+jobs:
+  plan:
+    name: Decide next action
+    runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.plan.outputs.mode }}
+      version: ${{ steps.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: plan
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          python3 scripts/release.py plan >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
+  prepare:
+    name: Refresh release branch
+    needs: plan
+    if: needs.plan.outputs.mode == 'prepare'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Bump, build and pin
+        run: |
+          set -euo pipefail
+          python3 scripts/release.py set-version "$VERSION"
+          scripts/build-dist.sh "$VERSION"
+          python3 scripts/release.py pin "$VERSION"
+          git --no-pager diff --stat
+
+      # The org forbids GitHub Actions from creating pull requests, so the job
+      # pushes the branch and leaves the compare link in the run summary. An
+      # already-open release PR picks the new commit up on its own.
+      - name: Push the release branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          BRANCH="release/v${VERSION}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git add -- \
+            trustguard/.codex-plugin/plugin.json \
+            cli/main.go \
+            trustguard/hooks/trustguard-hook.sh \
+            trustguard/hooks/trustguard-hook.ps1
+          if git diff --cached --quiet; then
+            echo "main already carries the pins for v${VERSION} — nothing to propose"
+            exit 0
+          fi
+          git commit -m "chore(release): v${VERSION}"
+          git push --force origin "$BRANCH"
+
+          url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/main...${BRANCH}?expand=1"
+          number="$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$number" ]; then
+            echo "::notice::Release PR #${number} updated with the pins for v${VERSION}"
+            {
+              echo "### Release v${VERSION} refreshed"
+              echo
+              echo "Pull request [#${number}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/${number}) now carries the pins built from \`${GITHUB_SHA}\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "::notice::Open the release PR for v${VERSION}: ${url}"
+          {
+            echo "### Release v${VERSION} is ready to propose"
+            echo
+            echo "[Open the release pull request](${url}) — merging it rebuilds the binaries,"
+            echo "checks they still hash to the pins on the branch, then tags \`v${VERSION}\`"
+            echo "and publishes them."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    name: Tag and publish
+    needs: plan
+    if: needs.plan.outputs.mode == 'publish'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+      TAG: v${{ needs.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Test
+        run: go test -race ./cli/
+
+      - name: Rebuild and verify the pins
+        id: verify
+        run: |
+          set -euo pipefail
+          scripts/build-dist.sh "$VERSION"
+          python3 scripts/release.py verify "$VERSION"
+
+      # Pins can only be wrong if whatever produced them built differently from
+      # this runner. Failing alone would dead-end the release, since main can
+      # not be corrected from here, so push a branch that re-pins with what
+      # this runner built and let a human merge it.
+      - name: Re-pin on mismatch
+        if: failure() && steps.verify.outcome == 'failure'
+        run: |
+          set -euo pipefail
+          BRANCH="release/v${VERSION}"
+          python3 scripts/release.py pin "$VERSION"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git add -- \
+            trustguard/hooks/trustguard-hook.sh \
+            trustguard/hooks/trustguard-hook.ps1
+          git commit -m "chore(release): re-pin v${VERSION}"
+          git push --force origin "$BRANCH"
+
+          url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/main...${BRANCH}?expand=1"
+          echo "::error::Pins did not match this runner; corrected checksums pushed to ${BRANCH}"
+          {
+            echo "### v${VERSION} was not published"
+            echo
+            echo "The checksums on \`main\` do not describe the binaries this runner built,"
+            echo "so nothing was tagged. [Merge the corrected pins](${url}) and the release"
+            echo "will publish itself."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Tag
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "${TAG} already tagged — reusing it"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "trustguard-codex ${VERSION}"
+          git push origin "$TAG"
+
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release delete "$TAG" --yes
+          fi
+          gh release create "$TAG" dist/* \
+            --title "trustguard-codex ${VERSION}" \
+            --notes "$(cat <<EOF
+          Automated release from \`main\`.
+
+          TrustGuard integration binary for Codex lifecycle hooks. Verify
+          downloads against \`SHA256SUMS\`; the plugin bootstraps on this tag are
+          pinned to the same hashes.
+          EOF
+          )"

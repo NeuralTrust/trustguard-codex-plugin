@@ -361,17 +361,36 @@ func TestFailClosedDenies(t *testing.T) {
 	}
 }
 
-func TestConsumerIDFallsBackToConfig(t *testing.T) {
+func TestConsumerIDComesOnlyFromConfig(t *testing.T) {
 	srv, captured := stubGuard(t, EvaluateResponse{Status: "allow"})
 	cfg := testConfig(srv.URL)
-	cfg.ConsumerID = "codex:mdm-user"
+	cfg.ConsumerID = "mdm-user"
 	_ = invokeHook(t, cfg, map[string]any{
 		"hook_event_name": "UserPromptSubmit",
 		"prompt":          "hello",
 		"session_id":      "thr_1",
 	})
-	if (*captured)["consumer_id"] != "codex:mdm-user" {
+	if (*captured)["consumer_id"] != "mdm-user" {
 		t.Fatalf("expected configured consumer_id, got %v", (*captured)["consumer_id"])
+	}
+}
+
+func TestConsumerIDOmittedWithoutConfig(t *testing.T) {
+	t.Setenv("CODEX_HOME", t.TempDir())
+	srv, captured := stubGuard(t, EvaluateResponse{Status: "allow"})
+	cfg := testConfig(srv.URL)
+	cfg.ConsumerID = ""
+	_ = invokeHook(t, cfg, map[string]any{
+		"hook_event_name": "UserPromptSubmit",
+		"prompt":          "hello",
+		"session_id":      "thr_1",
+		"user_email":      "alice@acme.com",
+	})
+	if _, ok := (*captured)["consumer_id"]; ok {
+		t.Fatalf("consumer_id must be omitted without config, got %v", (*captured)["consumer_id"])
+	}
+	if got := userEmailAttr(t, captured); got != "alice@acme.com" {
+		t.Fatalf("account email must still travel in attributes.user.email, got %q", got)
 	}
 }
 

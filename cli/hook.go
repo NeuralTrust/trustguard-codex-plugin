@@ -110,7 +110,7 @@ func buildEvaluateRequest(cfg Config, in hookInput) (EvaluateRequest, bool) {
 	base := EvaluateRequest{
 		Direction:  "input",
 		SessionID:  in.SessionID,
-		ConsumerID: consumerIDFor(cfg, in),
+		ConsumerID: cfg.ConsumerID,
 		Attributes: map[string]any{
 			"collector": map[string]any{"type": "ide"},
 			"source":    map[string]any{"application": "codex-plugin"},

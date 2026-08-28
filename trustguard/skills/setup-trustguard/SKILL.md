@@ -92,5 +92,6 @@ Expected: `decision:"block"` with `permissionDecision:"deny"`.
   This plugin uses **local managed hooks**, same class of control as Cursor.
 - Prefer `transform_action: "deny"` in enterprise if DLP findings must stop
   the tool call; Codex does not yet honour `permissionDecision:"ask"`.
-- Attribution uses the account email as `consumer_id` from hook `user_email`
-  or `~/.codex/auth.json`. Override with `TRUSTGUARD_CONSUMER_ID`.
+- Attribution sends the account email (hook `user_email` or
+  `~/.codex/auth.json`) as `attributes.user.email`. `consumer_id` is only sent
+  when set via `TRUSTGUARD_CONSUMER_ID` or config.

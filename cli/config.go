@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"os"
-	"os/user"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -37,9 +36,9 @@ type Config struct {
 	TimeoutMS int `json:"timeout_ms"`
 	// MaxContentBytes truncates tool content sent to the guard.
 	MaxContentBytes int `json:"max_content_bytes"`
-	// ConsumerID is an explicit override (MDM / TRUSTGUARD_CONSUMER_ID).
-	// If empty, runtime uses hook user_email, then the ChatGPT email in
-	// ~/.codex/auth.json, then the OS user.
+	// ConsumerID is set only by MDM / TRUSTGUARD_CONSUMER_ID. When empty the
+	// evaluate request omits consumer_id; the account email still travels in
+	// attributes.user.email.
 	ConsumerID string `json:"consumer_id"`
 	// Events disables individual hook events, e.g. {"PostToolUse": false}.
 	Events map[string]bool `json:"events"`
@@ -205,19 +204,8 @@ func (c *Config) reportNotice() bool {
 	return c.ReportNotice == nil || *c.ReportNotice
 }
 
-// consumerIDFor prefers an explicit configured consumer_id, then hook
-// user_email when present, then the ChatGPT account in ~/.codex/auth.json,
-// then the OS user.
-func consumerIDFor(cfg Config, in hookInput) string {
-	if cfg.ConsumerID != "" {
-		return cfg.ConsumerID
-	}
-	if email := accountEmail(in); email != "" {
-		return email
-	}
-	return currentUser()
-}
-
+// accountEmail prefers the hook-provided user_email, then the ChatGPT account
+// in ~/.codex/auth.json.
 func accountEmail(in hookInput) string {
 	if email := looksLikeEmail(in.UserEmail); email != "" {
 		return email
@@ -305,12 +293,4 @@ func emailFromJWT(tok string) string {
 		return ""
 	}
 	return looksLikeEmail(claims.Profile.Email)
-}
-
-func currentUser() string {
-	if u, err := user.Current(); err == nil && u.Username != "" {
-		return u.Username
-	}
-	host, _ := os.Hostname()
-	return host
 }
