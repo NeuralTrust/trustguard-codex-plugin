@@ -70,19 +70,23 @@ type verdict struct {
 func runHook(stdin io.Reader, stdout io.Writer, cfg Config) error {
 	// Decode incrementally: Codex may keep the stdin pipe open after writing
 	// the event, so waiting for EOF would hang the hook forever.
+	var raw json.RawMessage
+	if err := json.NewDecoder(io.LimitReader(stdin, 16<<20)).Decode(&raw); err != nil {
+		return fmt.Errorf("decode hook input: %w", err)
+	}
 	var in hookInput
-	if err := json.NewDecoder(io.LimitReader(stdin, 16<<20)).Decode(&in); err != nil {
+	if err := json.Unmarshal(raw, &in); err != nil {
 		return fmt.Errorf("decode hook input: %w", err)
 	}
 
-	out := decideEvent(cfg, in)
+	out := decideEvent(cfg, in, hookAttributes(raw))
 	if err := json.NewEncoder(stdout).Encode(out); err != nil {
 		return fmt.Errorf("write hook output: %w", err)
 	}
 	return nil
 }
 
-func decideEvent(cfg Config, in hookInput) hookOutput {
+func decideEvent(cfg Config, in hookInput, hookAttrs map[string]any) hookOutput {
 	if cfg.APIKey == "" {
 		logf("TRUSTGUARD_API_KEY missing; allowing %s without evaluation", in.HookEventName)
 		return allowOutput(in)
@@ -91,7 +95,7 @@ func decideEvent(cfg Config, in hookInput) hookOutput {
 		return allowOutput(in)
 	}
 
-	req, ok := buildEvaluateRequest(cfg, in)
+	req, ok := buildEvaluateRequest(cfg, in, hookAttrs)
 	if !ok {
 		return allowOutput(in)
 	}
@@ -106,7 +110,7 @@ func decideEvent(cfg Config, in hookInput) hookOutput {
 }
 
 // buildEvaluateRequest maps one Codex event onto the /v1/evaluate contract.
-func buildEvaluateRequest(cfg Config, in hookInput) (EvaluateRequest, bool) {
+func buildEvaluateRequest(cfg Config, in hookInput, hookAttrs map[string]any) (EvaluateRequest, bool) {
 	base := EvaluateRequest{
 		Direction:  "input",
 		SessionID:  in.SessionID,
@@ -114,12 +118,7 @@ func buildEvaluateRequest(cfg Config, in hookInput) (EvaluateRequest, bool) {
 		Attributes: map[string]any{
 			"collector": map[string]any{"type": "ide"},
 			"source":    map[string]any{"application": "codex-plugin"},
-			"codex": map[string]any{
-				"event": in.HookEventName,
-				"cwd":   in.Cwd,
-				"model": in.Model,
-				"turn":  in.TurnID,
-			},
+			"codex":     hookAttrs,
 		},
 	}
 	stampUserEmail(base.Attributes, accountEmail(in))
@@ -398,6 +397,16 @@ func stampToolName(attrs map[string]any, toolName string) {
 		return
 	}
 	attrs["tool"] = map[string]any{"name": toolName}
+}
+
+// hookAttributes is the stdin JSON as a map so every field Codex sent
+// (including ones this binary does not decode) travels in attributes.codex.
+func hookAttributes(raw json.RawMessage) map[string]any {
+	var m map[string]any
+	if err := json.Unmarshal(raw, &m); err != nil || m == nil {
+		return map[string]any{}
+	}
+	return m
 }
 
 // mcpCallName is the JSON-RPC tools/call name. Hosts expose MCP tools to hooks
