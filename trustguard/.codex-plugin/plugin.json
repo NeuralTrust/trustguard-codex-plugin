@@ -1,6 +1,6 @@
 {
   "name": "trustguard",
-	"version": "0.1.1",
+	"version": "0.1.2",
   "description": "AI firewall for the Codex agent: evaluates prompts, tool calls and tool results with NeuralTrust TrustGuard.",
   "author": {
     "name": "NeuralTrust",
