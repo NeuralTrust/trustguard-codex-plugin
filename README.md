@@ -56,10 +56,10 @@ Developers cannot disable managed hooks from `/hooks`.
 | `PreToolUse` (MCP / other tools) | `mcp` tools/call | input | Same deny / ask-as-context shape |
 | `PostToolUse` | `mcp` result | output | Detector `block` replaces the tool result; gate `ask` is ignored |
 
-`consumer_id` is the account email from hook `user_email` when present,
-else the ChatGPT email in `~/.codex/auth.json` (`tokens.id_token` / `email`
-claim). The collector already identifies the source. Override with
-`TRUSTGUARD_CONSUMER_ID` or `consumer_id` in config.
+`attributes.user.email` is the account email from hook `user_email` when
+present, else the ChatGPT email in `~/.codex/auth.json` (`tokens.id_token` /
+`email` claim). `consumer_id` is only sent when set via
+`TRUSTGUARD_CONSUMER_ID` or `consumer_id` in config; otherwise it is omitted.
 
 ## Repository layout
 
@@ -67,7 +67,8 @@ claim). The collector already identifies the source. Override with
 |---|---|
 | [`trustguard/`](./trustguard/) | Codex plugin (hooks, bootstraps, skill, logo) |
 | [`cli/`](./cli/) | `trustguard-codex` binary (Go, stdlib-only) |
-| [`scripts/`](./scripts/) | Cross-compile + local hook install |
+| [`.github/workflows/`](./.github/workflows/) | CI + the release state machine that pins and publishes the platform binaries |
+| [`scripts/`](./scripts/) | Release plumbing (`release.py`, `build-dist.sh`) and local hook install |
 | [`docs/`](./docs/) | Enterprise `requirements.toml` example |
 
 ```bash
@@ -76,6 +77,30 @@ make test           # go test -race ./cli/
 make install-local  # plugin + ~/.codex/hooks.json
 make dist VERSION=0.1.0
 ```
+
+## Releasing the binary
+
+`main` requires a pull request, so the **Release** workflow never writes to it.
+On every push it compares the version pinned in the repo with the `v*` tags and
+picks one of two actions:
+
+| State of `main` | Action |
+|---|---|
+| Pinned version is already tagged | **prepare** — bump the patch, build, pin the new checksums and push the `release/vX.Y.Z` branch |
+| Pinned version has no tag | **publish** — rebuild, verify the pins still match, tag and publish the GitHub Release |
+
+Shipping is therefore: merge your work, open the release pull request from the
+link the run summary leaves (Actions cannot open it — the org forbids that —
+but an already-open one keeps refreshing itself), then approve and merge it.
+Bump the minor or major by hand in `plugin.json` and the workflow pins that
+version instead of a patch.
+
+The publish job rebuilds rather than trusting what the pull request measured,
+and fails if any hash moved — the released assets always match the checksums
+the bootstraps verify. That reproducibility relies on the exact `GO_VERSION`
+pinned in the workflow; raise it together with the `go` directive in `go.mod`.
+
+Manual run: **Actions → Release → Run workflow**.
 
 ## Verify
 

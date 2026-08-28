@@ -36,7 +36,7 @@ func TestManagedModeLocksKeyFields(t *testing.T) {
 	}
 }
 
-func TestConsumerIDForReadsAuthJSON(t *testing.T) {
+func TestAccountEmailReadsAuthJSON(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("CODEX_HOME", home)
 	tok := unsignedJWT(`{"email":"joan@acme.com"}`)
@@ -44,13 +44,13 @@ func TestConsumerIDForReadsAuthJSON(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(home, "auth.json"), []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	got := consumerIDFor(Config{}, hookInput{})
+	got := accountEmail(hookInput{})
 	if got != "joan@acme.com" {
 		t.Fatalf("got %q", got)
 	}
 }
 
-func TestConsumerIDForHookEmailBeatsAuthJSON(t *testing.T) {
+func TestAccountEmailHookEmailBeatsAuthJSON(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("CODEX_HOME", home)
 	tok := unsignedJWT(`{"email":"joan@acme.com"}`)
@@ -58,22 +58,8 @@ func TestConsumerIDForHookEmailBeatsAuthJSON(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(home, "auth.json"), []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	got := consumerIDFor(Config{}, hookInput{UserEmail: "alice@acme.com"})
+	got := accountEmail(hookInput{UserEmail: "alice@acme.com"})
 	if got != "alice@acme.com" {
-		t.Fatalf("got %q", got)
-	}
-}
-
-func TestConsumerIDForConfiguredBeatsAuthJSON(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("CODEX_HOME", home)
-	tok := unsignedJWT(`{"email":"joan@acme.com"}`)
-	body := `{"tokens":{"id_token":"` + tok + `"}}`
-	if err := os.WriteFile(filepath.Join(home, "auth.json"), []byte(body), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	got := consumerIDFor(Config{ConsumerID: "codex:mdm"}, hookInput{UserEmail: "alice@acme.com"})
-	if got != "codex:mdm" {
 		t.Fatalf("got %q", got)
 	}
 }
