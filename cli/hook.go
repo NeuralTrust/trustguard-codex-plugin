@@ -140,12 +140,9 @@ func buildEvaluateRequest(cfg Config, in hookInput, hookAttrs map[string]any) (E
 		if in.ToolName == "" {
 			return base, false
 		}
-		if cmd := shellCommand(in); cmd != "" {
-			base.Protocol = "all"
-			base.Payload = map[string]any{"input": cmd}
-			stampToolName(base.Attributes, in.ToolName)
-			return base, true
-		}
+		// Shell commands go as tools/call like every other tool: as plain
+		// input TrustGuard would score them as user prompts (jailbreak,
+		// toxicity, moderation) rather than as tool arguments (ENG-1620).
 		base.Protocol = "mcp"
 		base.Payload = map[string]any{
 			"jsonrpc": "2.0",
@@ -178,22 +175,6 @@ func buildEvaluateRequest(cfg Config, in hookInput, hookAttrs map[string]any) (E
 		return base, true
 	}
 	return base, false
-}
-
-// shellCommand returns the command line for Bash / apply_patch tool calls.
-func shellCommand(in hookInput) string {
-	switch in.ToolName {
-	case "Bash", "apply_patch":
-	default:
-		return ""
-	}
-	var input struct {
-		Command string `json:"command"`
-	}
-	if err := json.Unmarshal(in.ToolInput, &input); err != nil {
-		return ""
-	}
-	return strings.TrimSpace(input.Command)
 }
 
 func decodeToolArguments(raw json.RawMessage) any {
