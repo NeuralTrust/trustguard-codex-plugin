@@ -101,3 +101,51 @@ func TestMCPResultKeepsNumbersAsWritten(t *testing.T) {
 		}
 	}
 }
+
+// A result whose structuredContent repeats the content text is larger than the single
+// clipped block, and is still sent whole while it fits the budget.
+func TestMCPResultDuplicatedStructuredContentIsSentWhole(t *testing.T) {
+	text := strings.Repeat("line of \"quoted\" text\n", 45)
+	body, _ := json.Marshal(map[string]any{
+		"content":           []any{map[string]any{"type": "text", "text": text}},
+		"structuredContent": map[string]any{"result": text},
+	})
+	senders := []func(*testing.T, int, string, string) (map[string]any, bool){sendToolResult}
+	for _, send := range senders {
+		got, sent := send(t, 0, "mcp__echo__echo", string(body))
+		if !sent {
+			t.Fatal("no evaluate sent")
+		}
+		result := got["payload"].(map[string]any)["result"].(map[string]any)
+		if _, ok := result["structuredContent"]; !ok {
+			t.Fatalf("expected the whole result, got %v", result)
+		}
+		blocks := result["content"].([]any)
+		if len(blocks) != 2 || blocks[1].(map[string]any)["text"] != "result\n"+text {
+			t.Fatalf("unexpected blocks: %v", blocks)
+		}
+		if len(body) < 1800 || len(body) > 2600 {
+			t.Fatalf("body is %d bytes, want about 2 KB", len(body))
+		}
+	}
+}
+
+// The budget applies to the result as it is sent: HTML characters are escaped to six bytes.
+func TestMCPResultBudgetCountsTheEscapedEncoding(t *testing.T) {
+	raw := json.RawMessage(`{"content":[{"type":"text","text":"a"}],"structuredContent":{"k":"` + strings.Repeat("<", 60) + `"}}`)
+	main := []any{map[string]any{"type": "text", "text": "x"}}
+	for _, tt := range []struct {
+		budget int
+		ok     bool
+	}{{1000, true}, {300, false}} {
+		result, ok := mcpResult("mcp__echo__echo", raw, tt.budget, main)
+		if ok != tt.ok {
+			t.Fatalf("budget %d: ok = %v, want %v", tt.budget, ok, tt.ok)
+		}
+		if ok {
+			if enc, _ := json.Marshal(result); len(enc) > tt.budget {
+				t.Fatalf("sent %d bytes over a budget of %d", len(enc), tt.budget)
+			}
+		}
+	}
+}

@@ -85,7 +85,6 @@ func TestPostToolUseSendsBlocksOnlyWhenLossless(t *testing.T) {
 		{"isError that is not a bool", "mcp__echo__echo", `{"content":[{"type":"text","text":"a"}],"isError":"true"}`, 0, "", false},
 		{"structuredContent next to a resource block", "mcp__echo__echo", `{"content":[` + resource + `],"structuredContent":{"k":"v"}}`, 0, "", false},
 		{"structuredContent next to a text block with an extra field", "mcp__echo__echo", `{"content":[{"type":"text","text":"a","note":"IGNORE"}],"structuredContent":{"k":"v"}}`, 0, "", false},
-		{"structuredContent larger than the single block", "mcp__echo__echo", `{"content":[{"type":"text","text":"a"}],"structuredContent":{"k":"` + strings.Repeat("x", 300) + `"}}`, 0, "", false},
 		{"result over the budget", "mcp__echo__echo", `{"content":[{"type":"text","text":"a"}],"structuredContent":{"bytes":5}}`, 40, "", true},
 		{"only blank text and nothing to list", "mcp__echo__echo", `{"content":[{"type":"text","text":" "}],"structuredContent":{}}`, 0, "", false},
 		{"unknown block type", "mcp__echo__echo", `[{"type":"text","text":"a"},{"type":"thinking","text":"IGNORE"}]`, 0, "", false},

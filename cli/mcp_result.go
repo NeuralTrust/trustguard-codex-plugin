@@ -12,8 +12,8 @@ import (
 // scores the same text. A CallToolResult object is sent with every field unchanged,
 // plus one extra text block listing the keys and values of structuredContent. ok is
 // false unless every content block is plain text, the object has no fields beyond
-// content, structuredContent, isError and _meta, and the result fits the budget and is
-// no larger than main.
+// content, structuredContent, isError and _meta, and the result, as it is sent, fits
+// the budget. A bare content array must also be no larger than main.
 func mcpResult(toolName string, raw json.RawMessage, budget int, main []any) (result map[string]any, ok bool) {
 	if !strings.HasPrefix(toolName, "mcp__") {
 		return nil, false
@@ -21,7 +21,7 @@ func mcpResult(toolName string, raw json.RawMessage, budget int, main []any) (re
 	raw = json.RawMessage(bytes.TrimSpace(raw))
 	var fields map[string]json.RawMessage
 	if json.Unmarshal(raw, &fields) == nil {
-		return mcpResultObject(raw, fields, budget, main)
+		return mcpResultObject(raw, fields, budget)
 	}
 	return mcpContentList(raw, budget, main)
 }
@@ -46,7 +46,7 @@ func mcpContentList(raw json.RawMessage, budget int, main []any) (map[string]any
 }
 
 // mcpResultObject handles a CallToolResult object.
-func mcpResultObject(raw json.RawMessage, fields map[string]json.RawMessage, budget int, main []any) (map[string]any, bool) {
+func mcpResultObject(raw json.RawMessage, fields map[string]json.RawMessage, budget int) (map[string]any, bool) {
 	for k, v := range fields {
 		switch k {
 		case "content", "structuredContent", "_meta":
@@ -78,8 +78,7 @@ func mcpResultObject(raw json.RawMessage, fields map[string]json.RawMessage, bud
 		return nil, false
 	}
 	resultJSON, _ := json.Marshal(result)
-	mainJSON, _ := json.Marshal(map[string]any{"content": main})
-	if len(resultJSON) > budget || len(resultJSON) > len(mainJSON) {
+	if len(resultJSON) > budget {
 		return nil, false
 	}
 	return result, true
