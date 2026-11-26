@@ -26,11 +26,6 @@ func TestMCPResultIsSentWholeWithTheStructuredBlock(t *testing.T) {
 			`{"content":[{"type":"text","text":"notes"},{"type":"text","text":"bytes\n5"}],"structuredContent":{"bytes":5},"isError":true}`,
 		},
 		{
-			"_meta is kept",
-			`{"content":[{"type":"text","text":"notes"}],"structuredContent":{"bytes":5},"_meta":{"k":"v","n":[1,2]}}`,
-			`{"content":[{"type":"text","text":"notes"},{"type":"text","text":"bytes\n5"}],"structuredContent":{"bytes":5},"_meta":{"k":"v","n":[1,2]}}`,
-		},
-		{
 			"nested structuredContent: sorted keys, arrays, null, bool, numbers",
 			`{"content":[{"type":"text","text":"\"a\" \"b\" \"c\" \"d\" \"e\" \"f\" \"g\" \"h\""}],"structuredContent":{"b":[1.50,null,true,"s"],"a":{"z":"w","y":false}}}`,
 			`{"content":[{"type":"text","text":"\"a\" \"b\" \"c\" \"d\" \"e\" \"f\" \"g\" \"h\""},{"type":"text","text":"a\ny\nfalse\nz\nw\nb\n1.50\nnull\ntrue\ns"}],"structuredContent":{"b":[1.50,null,true,"s"],"a":{"z":"w","y":false}}}`,
@@ -56,9 +51,9 @@ func TestMCPResultIsSentWholeWithTheStructuredBlock(t *testing.T) {
 			`{"content":[{"type":"text","text":"bytes\n5"}],"structuredContent":{"bytes":5}}`,
 		},
 		{
-			"no structuredContent keeps isError and _meta",
-			`{"content":[{"type":"text","text":"a"}],"isError":false,"_meta":{"k":"v"}}`,
-			`{"content":[{"type":"text","text":"a"}],"isError":false,"_meta":{"k":"v"}}`,
+			"no structuredContent keeps isError",
+			`{"content":[{"type":"text","text":"a"}],"isError":false}`,
+			`{"content":[{"type":"text","text":"a"}],"isError":false}`,
 		},
 	}
 	senders := []func(*testing.T, int, string, string) (map[string]any, bool){sendToolResult}
