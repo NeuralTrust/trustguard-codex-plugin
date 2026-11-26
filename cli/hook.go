@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"unicode/utf8"
 )
 
 // hookInput is the stdin payload Codex sends to every hook. Fields are a
@@ -161,14 +162,16 @@ func buildEvaluateRequest(cfg Config, in hookInput, hookAttrs map[string]any) (E
 		if strings.TrimSpace(text) == "" {
 			return base, false
 		}
+		content := []any{map[string]any{"type": "text", "text": clip(text, cfg.MaxContentBytes)}}
+		if blocks, ok := mcpResultBlocks(in.ToolName, in.ToolResponse, cfg.MaxContentBytes, content); ok {
+			content = blocks
+		}
 		base.Direction = "output"
 		base.Protocol = "mcp"
 		base.Payload = map[string]any{
 			"jsonrpc": "2.0",
 			"id":      1,
-			"result": map[string]any{
-				"content": []any{map[string]any{"type": "text", "text": clip(text, cfg.MaxContentBytes)}},
-			},
+			"result":  map[string]any{"content": content},
 		}
 		stampToolName(base.Attributes, mcpCallName(in.ToolName))
 		return base, true
@@ -217,6 +220,73 @@ func toolResponseText(raw json.RawMessage) string {
 	}
 	// Prefer a compact JSON encoding so MCP result objects stay inspectable.
 	return strings.TrimSpace(string(raw))
+}
+
+// mcpResultBlocks returns an MCP tool result as its content blocks, so TrustGuard
+// scores the same text TrustGate does. ok is false unless every block is plain text
+// and the blocks are no larger than main.
+func mcpResultBlocks(toolName string, raw json.RawMessage, budget int, main []any) (content []any, ok bool) {
+	if !strings.HasPrefix(toolName, "mcp__") {
+		return nil, false
+	}
+	raw = json.RawMessage(strings.TrimSpace(string(raw)))
+	var list json.RawMessage = raw
+	var obj map[string]json.RawMessage
+	if json.Unmarshal(raw, &obj) == nil {
+		for k, v := range obj {
+			switch {
+			case k == "content":
+				list = v
+			case k == "isError" && string(v) == "false":
+			default:
+				return nil, false
+			}
+		}
+		if _, has := obj["content"]; !has {
+			return nil, false
+		}
+	}
+	var blocks []json.RawMessage
+	if json.Unmarshal(list, &blocks) != nil || len(blocks) == 0 {
+		return nil, false
+	}
+	content = make([]any, len(blocks))
+	size, blank := 2+len(blocks)-1, true
+	for i, b := range blocks {
+		text, ok := plainText(b)
+		if !ok {
+			return nil, false
+		}
+		canonical := map[string]any{"type": "text", "text": text}
+		enc, _ := json.Marshal(canonical)
+		size += len(enc)
+		blank = blank && strings.TrimSpace(text) == ""
+		content[i] = canonical
+	}
+	if size > budget || blank {
+		return nil, false
+	}
+	// The blocks are used only when they are no larger on the wire than the single block.
+	blocksJSON, _ := json.Marshal(content)
+	mainJSON, _ := json.Marshal(main)
+	if len(blocksJSON) > len(mainJSON) {
+		return nil, false
+	}
+	return content, true
+}
+
+// plainText returns the text of a block that has exactly the keys type="text" and a
+// string text.
+func plainText(b json.RawMessage) (string, bool) {
+	var fields map[string]json.RawMessage
+	var typ string
+	var text *string
+	if json.Unmarshal(b, &fields) != nil || len(fields) != 2 ||
+		json.Unmarshal(fields["type"], &typ) != nil || typ != "text" ||
+		json.Unmarshal(fields["text"], &text) != nil || text == nil {
+		return "", false
+	}
+	return *text, true
 }
 
 func applyVerdict(cfg Config, res *EvaluateResponse) verdict {
@@ -438,9 +508,13 @@ func mcpCallName(hookToolName string) string {
 	return hookToolName
 }
 
+// clip cuts s to at most n bytes without splitting a UTF-8 rune.
 func clip(s string, n int) string {
 	if len(s) <= n {
 		return s
+	}
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
 	}
 	return s[:n]
 }
