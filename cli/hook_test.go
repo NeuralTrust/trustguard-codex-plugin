@@ -420,6 +420,42 @@ func TestEvaluateStampsFullHookJSON(t *testing.T) {
 	if codex["model"] != "o4-mini" || codex["turn_id"] != "turn-9" || codex["future_extra"] != "kept" {
 		t.Fatalf("attributes.codex must keep every stdin field, got %v", codex)
 	}
+	if _, ok := codex["prompt"]; ok {
+		t.Fatalf("attributes.codex must not repeat the prompt the payload carries, got %v", codex)
+	}
+}
+
+// The content an event is evaluated on travels once, in the payload: a copy
+// under attributes is stored unclipped and never masked by DLP.
+func TestEvaluateKeepsToolContentOutOfHookAttributes(t *testing.T) {
+	t.Setenv("CODEX_HOME", t.TempDir())
+	for _, event := range []string{"PreToolUse", "PostToolUse"} {
+		t.Run(event, func(t *testing.T) {
+			srv, captured := stubGuard(t, EvaluateResponse{Status: "allow"})
+			_ = invokeHook(t, testConfig(srv.URL), map[string]any{
+				"hook_event_name": event,
+				"tool_name":       "Bash",
+				"tool_input":      map[string]any{"command": "echo 555-0100"},
+				"tool_response":   "555-0100",
+				"tool_use_id":     "call_1",
+				"session_id":      "thr_1",
+				"turn_id":         "turn-9",
+				"cwd":             "/tmp/demo",
+			})
+			if (*captured)["payload"] == nil {
+				t.Fatalf("expected an evaluated payload, got %v", *captured)
+			}
+			codex := hookAttr(t, captured, "codex")
+			for _, field := range hookContentFields {
+				if _, ok := codex[field]; ok {
+					t.Fatalf("attributes.codex must not carry %s, got %v", field, codex)
+				}
+			}
+			if codex["tool_name"] != "Bash" || codex["tool_use_id"] != "call_1" || codex["turn_id"] != "turn-9" || codex["hook_event_name"] != event {
+				t.Fatalf("attributes.codex must keep the event's metadata, got %v", codex)
+			}
+		})
+	}
 }
 
 func userEmailAttr(t *testing.T, captured *map[string]any) string {
