@@ -11,17 +11,17 @@
 # The VERSION and SHA256_* table are updated per release.
 set -u
 
-VERSION="0.1.4"
+VERSION="0.1.5"
 BASE_URL="${TRUSTGUARD_CODEX_DOWNLOAD_BASE:-https://github.com/NeuralTrust/trustguard-codex-plugin/releases/download}"
 BIN_DIR="${TRUSTGUARD_CODEX_BIN_DIR:-$HOME/.trustguard/bin}"
 
 # Per-platform SHA-256 of the release binaries (filled per release).
-SHA256_darwin_amd64="c4a8ade6d613c6005932fa9a10fda477c30b3319b7681fb36b15f81473236635"
-SHA256_darwin_arm64="a1c8fb46095474e644671694d24193efcdd7cb4ffbfd55f04dd7e8ec6e0f17c0"
-SHA256_linux_amd64="6b4e7fd3166d77ed2da5ace8eb32a57b3da4da2c756459039ed43930c272d3ed"
-SHA256_linux_arm64="bf6567fab81d24edd191262a1c7a3be62b3edf02bdde65464e480184acf162da"
-SHA256_windows_amd64="0a4c6351dc2c11fe26a9141c67db30917059f612d436826aa68cd4cc4401e32a"
-SHA256_windows_arm64="e21dd64b13abd317468b006df8c32f8495a56ae96a1e2a5d36295c9071bb5cd5"
+SHA256_darwin_amd64="8dcedbfa6b9e179b444a85218400dc56da9406561b2b3fabca53f252137ec032"
+SHA256_darwin_arm64="c0247a96ddb81b3519ef3b8221fa850660c40fab84b6c62963198fd65f12f213"
+SHA256_linux_amd64="7254f2ebbb026cd89f2dbc3a8d58a211b7abebc338187083e24ca0a18689c2b9"
+SHA256_linux_arm64="1638435052350f9837e4af81b6af6360384a04f5c7a5b3d7de87400975c3e79f"
+SHA256_windows_amd64="1872c3a140d502cedeef1ad2f4bc1755b8e6cfe36448e047cfd264a1b3d3c3b0"
+SHA256_windows_arm64="742fb53d51d85d9d2f95f5a0766a49abe56ea1e25c04a55e683678018bd13922"
 
 fail_open() {
     echo "trustguard-codex bootstrap: $1 — allowing without evaluation" >&2
