@@ -227,7 +227,7 @@ func toolResponseText(raw json.RawMessage) string {
 }
 
 // mcpResultBlocks returns an MCP tool result as its content blocks, so TrustGuard
-// scores the same text TrustGate does. ok is false unless the conversion is lossless.
+// scores the same text TrustGate does. ok is false unless every block is plain text.
 func mcpResultBlocks(toolName string, raw json.RawMessage, budget int) (blocks []json.RawMessage, ok bool) {
 	if !strings.HasPrefix(toolName, "mcp__") {
 		return nil, false
@@ -252,14 +252,14 @@ func mcpResultBlocks(toolName string, raw json.RawMessage, budget int) (blocks [
 	if json.Unmarshal(list, &blocks) != nil || len(blocks) == 0 {
 		return nil, false
 	}
-	size, blank := 0, true
+	size, blank := 2+len(blocks)-1, true
 	for _, b := range blocks {
-		n, isText, nonBlank := mcpBlockSize(b)
+		n, nonBlank := plainTextBlockSize(b)
 		if n < 0 {
 			return nil, false
 		}
 		size += n
-		blank = blank && isText && !nonBlank
+		blank = blank && !nonBlank
 	}
 	if size > budget || blank {
 		return nil, false
@@ -267,33 +267,21 @@ func mcpResultBlocks(toolName string, raw json.RawMessage, budget int) (blocks [
 	return blocks, true
 }
 
-// mcpBlockSize is the scored size of a block, -1 when it is not a plain MCP block.
-func mcpBlockSize(b json.RawMessage) (size int, isText, nonBlank bool) {
+// plainTextBlockSize is the compact JSON size of a block that has exactly the keys
+// type="text" and text, and -1 for anything else.
+func plainTextBlockSize(b json.RawMessage) (size int, nonBlank bool) {
 	var fields map[string]json.RawMessage
-	var typ string
-	if json.Unmarshal(b, &fields) != nil || json.Unmarshal(fields["type"], &typ) != nil {
-		return -1, false, false
+	var typ, text string
+	if json.Unmarshal(b, &fields) != nil || len(fields) != 2 ||
+		json.Unmarshal(fields["type"], &typ) != nil || typ != "text" ||
+		json.Unmarshal(fields["text"], &text) != nil {
+		return -1, false
 	}
-	switch typ {
-	case "text":
-		var text string
-		if json.Unmarshal(fields["text"], &text) != nil {
-			return -1, false, false
-		}
-		for k := range fields {
-			if k != "type" && k != "text" && k != "annotations" && k != "_meta" {
-				return -1, false, false
-			}
-		}
-		return len(text), true, strings.TrimSpace(text) != ""
-	case "image", "audio", "resource", "resource_link":
-		var compact bytes.Buffer
-		if json.Compact(&compact, b) != nil {
-			return -1, false, false
-		}
-		return compact.Len(), false, true
+	var compact bytes.Buffer
+	if json.Compact(&compact, b) != nil {
+		return -1, false
 	}
-	return -1, false, false
+	return compact.Len(), strings.TrimSpace(text) != ""
 }
 
 func applyVerdict(cfg Config, res *EvaluateResponse) verdict {
