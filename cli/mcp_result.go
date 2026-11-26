@@ -12,9 +12,8 @@ import (
 // scores the same text. A CallToolResult object is sent with every field unchanged,
 // plus one extra text block listing the keys and values of structuredContent. ok is
 // false unless every content block is plain text, the object has no fields beyond
-// content, structuredContent and isError, and the result, as it is sent, fits
-// the budget. A result with a _meta key is not sent this way: _meta is not scored as
-// text here, so the caller falls back to the single block that holds it. A bare content array must also be no larger than main.
+// content, structuredContent, isError and _meta, and the result, as it is sent, fits
+// the budget. A bare content array must also be no larger than main.
 func mcpResult(toolName string, raw json.RawMessage, budget int, main []any) (result map[string]any, ok bool) {
 	if !strings.HasPrefix(toolName, "mcp__") {
 		return nil, false
@@ -50,7 +49,8 @@ func mcpContentList(raw json.RawMessage, budget int, main []any) (map[string]any
 func mcpResultObject(raw json.RawMessage, fields map[string]json.RawMessage, budget int) (map[string]any, bool) {
 	for k, v := range fields {
 		switch k {
-		case "content", "structuredContent":
+		// Codex never shows _meta to the model (its output payload is structuredContent or content).
+		case "content", "structuredContent", "_meta":
 		case "isError":
 			if s := string(bytes.TrimSpace(v)); s != "true" && s != "false" {
 				return nil, false
