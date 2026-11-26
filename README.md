@@ -52,7 +52,8 @@ Developers cannot disable managed hooks from `/hooks`.
 | Codex event | TrustGuard protocol | Direction | Notes |
 |---|---|---|---|
 | `UserPromptSubmit` | `llm` | input | Block with `decision: "block"` |
-| `PreToolUse` (any tool, `Bash` / `apply_patch` included) | `mcp` tools/call | input | Deny with `permissionDecision: "deny"`. Gate `ask` collapses to allow + context (Codex does not honour `permissionDecision:"ask"`) |
+| `PreToolUse` (`Bash` / `apply_patch`) | `all` | input | Deny with `permissionDecision: "deny"`. Gate `ask` collapses to allow + context (Codex does not honour `permissionDecision:"ask"`) |
+| `PreToolUse` (MCP / other tools) | `mcp` tools/call | input | Same deny / ask-as-context shape |
 | `PostToolUse` | `mcp` result | output | Detector `block` replaces the tool result; gate `ask` is ignored |
 
 `attributes.user.email` is the account email from hook `user_email` when
