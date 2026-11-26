@@ -55,6 +55,41 @@ func TestMCPResultIsSentWholeWithTheStructuredBlock(t *testing.T) {
 			`{"content":[{"type":"text","text":"a"}],"isError":false}`,
 			`{"content":[{"type":"text","text":"a"}],"isError":false}`,
 		},
+		{
+			"_meta null is sent unchanged",
+			`{"content":[{"type":"text","text":"a"}],"_meta":null}`,
+			`{"content":[{"type":"text","text":"a"}],"_meta":null}`,
+		},
+		{
+			"_meta null with structuredContent",
+			`{"content":[{"type":"text","text":"a"}],"structuredContent":{"k":"v"},"_meta":null}`,
+			`{"content":[{"type":"text","text":"a"},{"type":"text","text":"k\nv"}],"structuredContent":{"k":"v"},"_meta":null}`,
+		},
+		{
+			"_meta string is sent unchanged",
+			`{"content":[{"type":"text","text":"a"}],"_meta":"s"}`,
+			`{"content":[{"type":"text","text":"a"}],"_meta":"s"}`,
+		},
+		{
+			"_meta string with structuredContent",
+			`{"content":[{"type":"text","text":"a"}],"structuredContent":{"k":"v"},"_meta":"s"}`,
+			`{"content":[{"type":"text","text":"a"},{"type":"text","text":"k\nv"}],"structuredContent":{"k":"v"},"_meta":"s"}`,
+		},
+		{
+			"_meta nested is sent unchanged",
+			`{"content":[{"type":"text","text":"a"}],"_meta":{"k":{"n":[1,2]}}}`,
+			`{"content":[{"type":"text","text":"a"}],"_meta":{"k":{"n":[1,2]}}}`,
+		},
+		{
+			"_meta nested with structuredContent",
+			`{"content":[{"type":"text","text":"a"}],"structuredContent":{"k":"v"},"_meta":{"k":{"n":[1,2]}}}`,
+			`{"content":[{"type":"text","text":"a"},{"type":"text","text":"k\nv"}],"structuredContent":{"k":"v"},"_meta":{"k":{"n":[1,2]}}}`,
+		},
+		{
+			"Codex result: content, structuredContent and serverInfo _meta",
+			`{"content":[{"type":"text","text":"notes"}],"structuredContent":{"bytes":5},"_meta":{"serverInfo":{"name":"x","version":"1.0"}}}`,
+			`{"content":[{"type":"text","text":"notes"},{"type":"text","text":"bytes\n5"}],"structuredContent":{"bytes":5},"_meta":{"serverInfo":{"name":"x","version":"1.0"}}}`,
+		},
 	}
 	senders := []func(*testing.T, int, string, string) (map[string]any, bool){sendToolResult}
 	for _, send := range senders {
